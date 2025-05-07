@@ -1,0 +1,20 @@
+# Entornos virtuales
+proc_img_env/
+.env/
+
+# Archivos bytecode de Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Archivos de configuración de editores comunes
+.vscode/
+.idea/
+
+# Archivos de entorno y configuración
+*.env
+*.DS_Store
+
+# Dependencias
+pip-wheel-metadata/
+*.egg-info/
