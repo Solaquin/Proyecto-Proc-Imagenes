@@ -279,8 +279,6 @@ def main():
     print(f"Forma geométrica: {forma}")
     print(f"Estado de madurez: {madurez}")
     print(f"Calidad para consumo: {calidad}")
-    #Mostrar HSV
-    graficar_hsv(imagen)
 
     cv2.imshow("Fruta a evaluar", imagen)
     cv2.waitKey(0)
