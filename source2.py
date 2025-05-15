@@ -1,5 +1,5 @@
 import tkinter as tk
-from tkinter import filedialog
+from tkinter import filedialog, ttk
 from PIL import Image, ImageTk
 import cv2
 import numpy as np
@@ -10,6 +10,8 @@ class FruitClassifierApp:
     def __init__(self, root):
         self.root = root
         self.root.title("Clasificador de Frutas por Forma, Color y Madurez")
+
+        self.create_scrollable_frame()
 
         # Variables de imagen
         self.imagen_original = None
@@ -34,19 +36,44 @@ class FruitClassifierApp:
         # Configuración de la interfaz
         self.setup_ui()
 
+    def create_scrollable_frame(self):
+        # Crear un canvas y scrollbar vertical
+        self.canvas = tk.Canvas(self.root)
+        self.scrollbar = ttk.Scrollbar(self.root, orient="vertical", command=self.canvas.yview)
+        self.scrollable_frame = ttk.Frame(self.canvas)
+        
+        # Configurar el frame para que se actualice el scroll
+        self.scrollable_frame.bind(
+            "<Configure>",
+            lambda e: self.canvas.configure(
+                scrollregion=self.canvas.bbox("all")
+            )
+        )
+        
+        # Crear una ventana en el canvas para el frame
+        self.canvas.create_window((0, 0), window=self.scrollable_frame, anchor="nw")
+        self.canvas.configure(yscrollcommand=self.scrollbar.set)
+        
+        # Empaquetar los elementos
+        self.canvas.pack(side="left", fill="both", expand=True)
+        self.scrollbar.pack(side="right", fill="y")
+
     def setup_ui(self):
         # Paneles de visualización
-        self.panel_original = tk.Label(self.root)
+        self.panel_original = tk.Label(self.scrollable_frame)
         self.panel_original.grid(row=0, column=0, padx=5, pady=5)
 
-        self.panel_contorno = tk.Label(self.root)
+        self.panel_contorno = tk.Label(self.scrollable_frame)
         self.panel_contorno.grid(row=0, column=1, padx=5, pady=5)
 
-        self.panel_madurez = tk.Label(self.root)
-        self.panel_madurez.grid(row=0, column=2, padx=5, pady=5)
+        self.panel_mask = tk.Label(self.scrollable_frame)
+        self.panel_mask.grid(row=0, column=2, padx=5, pady=5)
+
+        self.panel_madurez = tk.Label(self.scrollable_frame)
+        self.panel_madurez.grid(row=1, column=1, padx=5, pady=5)
 
         # Botón para cargar imagen
-        btn_cargar = tk.Button(self.root, text="Cargar Imagen", command=self.cargar_imagen)
+        btn_cargar = tk.Button(self.scrollable_frame, text="Cargar Imagen", command=self.cargar_imagen)
         btn_cargar.grid(row=1, column=0, pady=5, sticky='we')
 
         # Sliders HSV para fruta
@@ -56,24 +83,27 @@ class FruitClassifierApp:
         valores_iniciales = [20, 50, 50, 80, 255, 255]
 
         for i, (etiqueta, rango, val) in enumerate(zip(etiquetas, rangos, valores_iniciales)):
-            tk.Label(self.root, text=etiqueta).grid(row=2+i, column=0, sticky='w')
-            self.sliders[etiqueta] = tk.Scale(self.root, from_=rango[0], to=rango[1], orient='horizontal',
+            tk.Label(self.scrollable_frame, text=etiqueta).grid(row=2+i, column=0, sticky='w')
+            self.sliders[etiqueta] = tk.Scale(self.scrollable_frame, from_=rango[0], to=rango[1], orient='horizontal',
                                             command=self.actualizar_mascara)
             self.sliders[etiqueta].set(val)
             self.sliders[etiqueta].grid(row=2+i, column=1, columnspan=2, sticky='we')
 
         # Botón para clasificar
-        btn_clasificar = tk.Button(self.root, text="Clasificar Fruta", command=self.clasificar_fruta)
+        btn_clasificar = tk.Button(self.scrollable_frame, text="Clasificar Fruta", command=self.clasificar_fruta)
         btn_clasificar.grid(row=8, column=0, columnspan=3, pady=10, sticky='we')
 
         # Área de resultados
-        self.resultado_label = tk.Label(self.root, text="Seleccione una imagen y ajuste la máscara", 
+        self.resultado_label = tk.Label(self.scrollable_frame, text="Seleccione una imagen y ajuste la máscara", 
                                       font=("Arial", 12))
         self.resultado_label.grid(row=9, column=0, columnspan=3)
 
         # Debug info
-        self.debug_text = tk.Text(self.root, height=12, width=80, state='disabled')
+        self.debug_text = tk.Text(self.scrollable_frame, height=12, width=80, state='disabled')
         self.debug_text.grid(row=10, column=0, columnspan=3, padx=5, pady=5)
+
+    def _on_mousewheel(self, event):
+        self.canvas.yview_scroll(int(-1*(event.delta/120)), "units")
 
     def cargar_imagen(self):
         path = filedialog.askopenfilename()
@@ -109,6 +139,14 @@ class FruitClassifierApp:
         
         self.mostrar_imagen(img_contorno, panel)
 
+    def mostrar_mascara(self, mask, panel):
+        mask_visual = mask.copy()
+        img_pil = Image.fromarray(mask_visual)
+        img_pil = img_pil.resize((300, 300), Image.Resampling.LANCZOS)
+        img_tk = ImageTk.PhotoImage(image=img_pil)
+        panel.img_tk = img_tk
+        panel.config(image=img_tk)
+
     def actualizar_mascara(self, event=None):
         if self.imagen_hsv is None:
             return
@@ -124,6 +162,7 @@ class FruitClassifierApp:
         upper_hsv = np.array([h_high, s_high, v_high])
 
         self.mask_actual = cv2.inRange(self.imagen_hsv, lower_hsv, upper_hsv)
+        self.mostrar_mascara(self.mask_actual, self.panel_mask)
         self.actualizar_contornos()
 
     def actualizar_contornos(self):
@@ -274,5 +313,7 @@ class FruitClassifierApp:
 
 if __name__ == "__main__":
     root = tk.Tk()
+    root.geometry("960x800")  # Puedes ajustar estos valores según necesites
+    root.minsize(960, 600)  # Ancho mínimo, alto mínimo
     app = FruitClassifierApp(root)
     root.mainloop()
