@@ -5,8 +5,9 @@ import pandas as pd
 import pywt
 from skimage.measure import label, regionprops
 from scipy.spatial.distance import euclidean
-
+import matplotlib.pyplot as plt
 from sklearn.preprocessing import StandardScaler
+
 
 
 # -------------------- Preprocesamiento y características --------------------
@@ -71,6 +72,15 @@ def aplicar_wavelet(imagen):
     energia = np.sum(np.square(cA2)) + np.sum(np.square(cH2)) + np.sum(np.square(cV2)) + np.sum(np.square(cD2))
     return energia
 
+# NUEVA FUNCIÓN: extraer características de frecuencia con Transformada de Fourier
+def aplicar_fourier(imagen):
+    f = np.fft.fft2(imagen)
+    fshift = np.fft.fftshift(f)
+    magnitude_spectrum = np.abs(fshift)
+    energia_frecuencia = np.mean(magnitude_spectrum)
+    return energia_frecuencia
+
+# ACTUALIZACIÓN: Añadir Fourier al vector de características
 def extraer_caracteristicas_fruta(imagen):
     imagen_pre = preprocesar(imagen)
     binaria = binarizar(imagen_pre)
@@ -78,10 +88,28 @@ def extraer_caracteristicas_fruta(imagen):
     orient = calcular_orientacion(imagen_pre)
     gabor = aplicar_gabor(imagen_pre)
     wavelet = aplicar_wavelet(imagen_pre)
+    fourier = aplicar_fourier(imagen_pre)  # NUEVO
+
     if region:
-        return [region.area, region.eccentricity, orient, np.mean(gabor), wavelet]
+        forma_solidez = region.solidity
+        forma_extension = region.extent
+        forma_eje_mayor = region.major_axis_length
+        forma_eje_menor = region.minor_axis_length
+        forma_relacion_aspecto = forma_eje_mayor / forma_eje_menor if forma_eje_menor != 0 else 0
+
+        return [
+            region.area,
+            region.eccentricity,
+            forma_solidez,
+            forma_extension,
+            forma_relacion_aspecto,
+            orient,
+            np.mean(gabor),
+            wavelet,
+            fourier  # NUEVA característica
+        ]
     else:
-        return [0, 0, orient, np.mean(gabor), wavelet]
+        return [0, 0, 0, 0, 0, orient, np.mean(gabor), wavelet, fourier]  # Consistencia
 
 # -------------------- Clasificación de madurez y calidad --------------------
 
@@ -251,6 +279,12 @@ def main():
     print(f"Forma geométrica: {forma}")
     print(f"Estado de madurez: {madurez}")
     print(f"Calidad para consumo: {calidad}")
+    #Mostrar HSV
+    graficar_hsv(imagen)
+
+    cv2.imshow("Fruta a evaluar", imagen)
+    cv2.waitKey(0)
+    cv2.destroyAllWindows() 
 
 
 if __name__ == "__main__":
