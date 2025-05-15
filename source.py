@@ -304,7 +304,45 @@ for fruta in frutas:
         },
         "muestras": len(aspectos)
     }
+def calcular_promedios_hsv_por_fruta(dataset):
+    import cv2
+    import numpy as np
+    import os
 
+    frutas = os.listdir(dataset)
+    resultados = {}
+
+    for fruta in frutas:
+        carpeta = os.path.join(dataset, fruta)
+        hsvs = []
+
+        for archivo in os.listdir(carpeta):
+            if not archivo.endswith((".jpg", ".png", ".jpeg")):
+                continue
+
+            imagen = cv2.imread(os.path.join(carpeta, archivo))
+            imagen_hsv = cv2.cvtColor(imagen, cv2.COLOR_BGR2HSV)
+
+            # Crear máscara basada en segmentación (aquí puedes mejorarla con tu contorno real)
+            mascara = cv2.inRange(imagen_hsv, (0, 40, 40), (180, 255, 255))
+            hsv_valores = imagen_hsv[mascara > 0]
+
+            if hsv_valores.size > 0:
+                media = np.mean(hsv_valores, axis=0)  # (H, S, V)
+                hsvs.append(media)
+
+        if hsvs:
+            hsvs = np.array(hsvs)
+            promedio = np.mean(hsvs, axis=0)
+            desviacion = np.std(hsvs, axis=0)
+            resultados[fruta] = {
+                "media": promedio,
+                "std": desviacion,
+                "min": np.min(hsvs, axis=0),
+                "max": np.max(hsvs, axis=0)
+            }
+
+    return resultados
 # -------------------- Main --------------------
 
 def main():
@@ -340,7 +378,15 @@ def main():
     print(df)
 
    
+    ruta_dataset = "dataset"
+    resultados = calcular_promedios_hsv_por_fruta(ruta_dataset)
 
+    for fruta, datos in resultados.items():
+        media = datos["media"]
+        std = datos["std"]  
+        print(f"{fruta}:")
+        print(f"  HSV promedio: H={media[0]:.1f}, S={media[1]:.1f}, V={media[2]:.1f}")
+        print(f"  STD: H={std[0]:.1f}, S={std[1]:.1f}, V={std[2]:.1f}")
     for fruta, stats in resultados.items():
         print(f"\n{fruta.capitalize()}:")
         print(f"  Aspecto - media: {stats['aspecto']['media']:.3f}, std: {stats['aspecto']['std']:.3f}, min: {stats['aspecto']['min']:.3f}, max: {stats['aspecto']['max']:.3f}")

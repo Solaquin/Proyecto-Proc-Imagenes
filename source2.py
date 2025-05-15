@@ -22,9 +22,9 @@ class FruitClassifierApp:
         # Rangos de color para cada fruta (en HSV)
         self.rangos_color = {
             "Plátano": {"lower": np.array([20, 50, 50]), "upper": np.array([40, 255, 255])},
-            "Mango": {"lower": np.array([10, 100, 50]), "upper": np.array([25, 255, 255])},
-            "Aguacate": {"lower": np.array([35, 50, 50]), "upper": np.array([85, 255, 255])},
-            "Limón": {"lower": np.array([0, 50, 50]), "upper": np.array([80, 255, 255])}
+            "Mango": {"lower": np.array([5, 97, 95]), "upper": np.array([39, 152, 166])},
+            "Aguacate": {"lower": np.array([27, 126, 73]), "upper": np.array([42, 202, 140])},
+            "Limón": {"lower": np.array([16, 66, 70]), "upper": np.array([36, 170, 199])}
         }
 
         # Rangos para detección de manchas (madurez)
