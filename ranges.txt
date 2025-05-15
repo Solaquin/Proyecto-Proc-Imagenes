@@ -1,0 +1,10 @@
+        if relacion_aspecto < 0.5 and circularidad < 0.7:
+            resultado = "Plátano"
+        elif 0.6 < relacion_aspecto < 0.8 and 0.4 < circularidad < 0.5:
+            resultado = "Aguacate"
+        elif relacion_aspecto > 0.9 and 0.2 < circularidad < 0.7:
+            resultado = "Limón"
+        elif 0.5 < relacion_aspecto < 0.9 and 0.2 < circularidad < 0.7:
+            resultado = "Mango"
+        else:
+            resultado = "No identificado"

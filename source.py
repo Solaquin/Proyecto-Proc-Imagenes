@@ -29,6 +29,27 @@ def extraer_region(binaria):
         return props[0]
     return None
 
+def clasificar_forma(region):
+    # Relación de aspecto
+    bbox = region.bbox
+    alto = bbox[2] - bbox[0]
+    ancho = bbox[3] - bbox[1]
+    aspecto = ancho / alto if alto != 0 else 0
+
+    # Circularidad: 4π * área / perímetro^2
+    perimetro = region.perimeter if region.perimeter != 0 else 1
+    circularidad = 4 * np.pi * region.area / (perimetro ** 2)
+
+    if aspecto > 2:
+        return "Alargada"
+    elif circularidad > 0.85:
+        return "Redonda"
+    elif 0.6 < circularidad <= 0.85:
+        return "Ovalada"
+    else:
+        return "Irregular"
+
+
 def calcular_orientacion(imagen):
     gx = cv2.Sobel(imagen, cv2.CV_64F, 1, 0, ksize=5)
     gy = cv2.Sobel(imagen, cv2.CV_64F, 0, 1, ksize=5)
@@ -135,41 +156,64 @@ def cargar_ultima_imagen(ruta):
     imagen = cv2.imread(path)
     return imagen, ultima
 
+def cargar_imagen(ruta, idx):
+    archivos = sorted(os.listdir(ruta), key=lambda x: os.path.getctime(os.path.join(ruta, x)))
+    if idx < 0 or idx >= len(archivos):
+        raise IndexError("Índice fuera de rango")
+    ultima = archivos[idx]
+    path = os.path.join(ruta, ultima)
+    imagen = cv2.imread(path)
+    return imagen, ultima
+
+
+
 def clasificar_imagen(IMG_PRUEBAS):
-    # Cargar la imagen y extraer sus características
+    # Cargar la imagen de prueba
     img = cv2.imread(IMG_PRUEBAS)
     caract_imagen = extraer_caracteristicas_fruta(img)
-    
-    print(f"Características de la imagen de prueba: {caract_imagen}")  # <-- Añadir esto
-    
+
     # Cargar la base de características
     base_caracteristicas = np.load("base_caracteristicas.npy", allow_pickle=True).item()
 
-    # Normalizar la imagen de prueba
-    scaler = StandardScaler()
-    caract_imagen_normalizada = scaler.fit_transform([caract_imagen])[0]
-    
-    # Comparar la imagen con la base
-    mejor_fruta = None
-    menor_distancia = float('inf')
+    # Preparar vectores y etiquetas
+    vectores = []
+    etiquetas = []
 
-    for fruta, vectores in base_caracteristicas.items():
-        for vector in vectores:
-            # Normalizar cada vector de la base
-            vector_normalizado = scaler.transform([vector])[0]
-            
-            # Calcular la distancia euclidiana
-            dist = euclidean(caract_imagen_normalizada, vector_normalizado)
-            if dist < menor_distancia:
-                menor_distancia = dist
-                mejor_fruta = fruta
+    for fruta, lista_vectores in base_caracteristicas.items():
+        for vec in lista_vectores:
+            vectores.append(vec)
+            etiquetas.append(fruta)
+
+    # Añadir la imagen de prueba al final
+    vectores.append(caract_imagen)
+
+    # Normalizar todos juntos
+    scaler = StandardScaler()
+    vectores_normalizados = scaler.fit_transform(vectores)
+
+    # Extraer la imagen de prueba ya normalizada (última fila)
+    prueba_normalizada = vectores_normalizados[-1]
+    base_normalizada = vectores_normalizados[:-1]
+
+    # Comparar distancias
+    menor_distancia = float('inf')
+    mejor_fruta = None
+
+    for i, vector in enumerate(base_normalizada):
+        dist = euclidean(prueba_normalizada, vector)
+        if dist < menor_distancia:
+            menor_distancia = dist
+            mejor_fruta = etiquetas[i]
 
     return mejor_fruta
+
 # -------------------- Main --------------------
 
 def main():
-    imagen, nombre_archivo = cargar_ultima_imagen("IMG_PRUEBAS")
-    cv2.imshow("Fruta a evaluar", imagen)
+    imagen, nombre_archivo = cargar_imagen("IMG_PRUEBAS", 4)
+    alto, ancho, canales = imagen.shape
+    imagen_resized = cv2.resize(imagen, (ancho // 2, alto // 2))
+    cv2.imshow("Fruta a evaluar", imagen_resized)
     cv2.waitKey(0)
     cv2.destroyAllWindows()
 
@@ -179,6 +223,10 @@ def main():
 
     madurez = clasificar_madurez_por_fruta(fruta.lower(), imagen)
     calidad = evaluar_calidad(imagen)
+    imagen_pre = preprocesar(imagen)
+    binaria = binarizar(imagen_pre)
+    region = extraer_region(binaria)
+    forma = clasificar_forma(region) if region else "Desconocida"
     # Cargar la base
     base = np.load("base_caracteristicas.npy", allow_pickle=True).item()
 
@@ -191,7 +239,7 @@ def main():
             rows.append(row)
 
     df = pd.DataFrame(rows)  # ← Aquí se usa `pd`
-    print(df.head())
+    print(df)
 
     base_caracteristicas = np.load("base_caracteristicas.npy", allow_pickle=True).item()
     for fruta, caracteristicas in base_caracteristicas.items():
@@ -200,6 +248,7 @@ def main():
     print("Subcarpetas encontradas en 'dataset':", os.listdir("dataset"))   
     print(f"Tu fruta a evaluar es: {nombre_archivo}")
     print(f"La fruta es: {fruta}")
+    print(f"Forma geométrica: {forma}")
     print(f"Estado de madurez: {madurez}")
     print(f"Calidad para consumo: {calidad}")
 
