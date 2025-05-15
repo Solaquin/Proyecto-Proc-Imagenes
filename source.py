@@ -5,8 +5,9 @@ import pandas as pd
 import pywt
 from skimage.measure import label, regionprops
 from scipy.spatial.distance import euclidean
-
+import matplotlib.pyplot as plt
 from sklearn.preprocessing import StandardScaler
+
 
 
 # -------------------- Preprocesamiento y características --------------------
@@ -50,6 +51,15 @@ def aplicar_wavelet(imagen):
     energia = np.sum(np.square(cA2)) + np.sum(np.square(cH2)) + np.sum(np.square(cV2)) + np.sum(np.square(cD2))
     return energia
 
+# NUEVA FUNCIÓN: extraer características de frecuencia con Transformada de Fourier
+def aplicar_fourier(imagen):
+    f = np.fft.fft2(imagen)
+    fshift = np.fft.fftshift(f)
+    magnitude_spectrum = np.abs(fshift)
+    energia_frecuencia = np.mean(magnitude_spectrum)
+    return energia_frecuencia
+
+# ACTUALIZACIÓN: Añadir Fourier al vector de características
 def extraer_caracteristicas_fruta(imagen):
     imagen_pre = preprocesar(imagen)
     binaria = binarizar(imagen_pre)
@@ -57,10 +67,28 @@ def extraer_caracteristicas_fruta(imagen):
     orient = calcular_orientacion(imagen_pre)
     gabor = aplicar_gabor(imagen_pre)
     wavelet = aplicar_wavelet(imagen_pre)
+    fourier = aplicar_fourier(imagen_pre)  # NUEVO
+
     if region:
-        return [region.area, region.eccentricity, orient, np.mean(gabor), wavelet]
+        forma_solidez = region.solidity
+        forma_extension = region.extent
+        forma_eje_mayor = region.major_axis_length
+        forma_eje_menor = region.minor_axis_length
+        forma_relacion_aspecto = forma_eje_mayor / forma_eje_menor if forma_eje_menor != 0 else 0
+
+        return [
+            region.area,
+            region.eccentricity,
+            forma_solidez,
+            forma_extension,
+            forma_relacion_aspecto,
+            orient,
+            np.mean(gabor),
+            wavelet,
+            fourier  # NUEVA característica
+        ]
     else:
-        return [0, 0, orient, np.mean(gabor), wavelet]
+        return [0, 0, 0, 0, 0, orient, np.mean(gabor), wavelet, fourier]  # Consistencia
 
 # -------------------- Clasificación de madurez y calidad --------------------
 
@@ -145,9 +173,12 @@ def clasificar_imagen(IMG_PRUEBAS):
     # Cargar la base de características
     base_caracteristicas = np.load("base_caracteristicas.npy", allow_pickle=True).item()
 
-    # Normalizar la imagen de prueba
-    scaler = StandardScaler()
-    caract_imagen_normalizada = scaler.fit_transform([caract_imagen])[0]
+    # Unir toda la base para ajustar el scaler
+    todos_vectores = [vec for lista in base_caracteristicas.values() for vec in lista]
+    scaler = StandardScaler().fit(todos_vectores)
+
+    caract_imagen_normalizada = scaler.transform([caract_imagen])[0]
+
     
     # Comparar la imagen con la base
     mejor_fruta = None
@@ -165,6 +196,28 @@ def clasificar_imagen(IMG_PRUEBAS):
                 mejor_fruta = fruta
 
     return mejor_fruta
+def graficar_hsv(imagen):
+    hsv = cv2.cvtColor(imagen, cv2.COLOR_BGR2HSV)
+    h_mean = np.mean(hsv[:, :, 0])
+    s_mean = np.mean(hsv[:, :, 1])
+    v_mean = np.mean(hsv[:, :, 2])
+
+    print(f'Promedio H: {h_mean:.2f}')
+    print(f'Promedio S: {s_mean:.2f}')
+    print(f'Promedio V: {v_mean:.2f}')
+
+    plt.figure(figsize=(5, 4))
+    valores = [h_mean, s_mean, v_mean]
+    nombres = ['Hue (H)', 'Saturation (S)', 'Value (V)']
+    colores = ['orange', 'blue', 'green']
+
+    plt.bar(nombres, valores, color=colores)
+    plt.ylim(0, 255)
+    plt.title("Promedios HSV de imagen de prueba")
+    plt.ylabel("Valor promedio")
+    plt.grid(axis='y', linestyle='--', alpha=0.7)
+    plt.tight_layout()
+    plt.show()
 # -------------------- Main --------------------
 
 def main():
@@ -190,7 +243,11 @@ def main():
             row.update({f'F{i+1}': v for i, v in enumerate(vector)})
             rows.append(row)
 
-    df = pd.DataFrame(rows)  # ← Aquí se usa `pd`
+    # Mostrar con nombres más explícitos (opcional)
+    columnas = ['Fruta', 'Área', 'Excentricidad', 'Solidez', 'Extensión', 'Aspecto',
+            'Orientación', 'Gabor', 'Wavelet', 'Fourier']
+    df = pd.DataFrame(rows)
+    df.columns = columnas  # Esto requiere que todos los vectores tengan 9 valores
     print(df.head())
 
     base_caracteristicas = np.load("base_caracteristicas.npy", allow_pickle=True).item()
@@ -202,6 +259,12 @@ def main():
     print(f"La fruta es: {fruta}")
     print(f"Estado de madurez: {madurez}")
     print(f"Calidad para consumo: {calidad}")
+    #Mostrar HSV
+    graficar_hsv(imagen)
+
+    cv2.imshow("Fruta a evaluar", imagen)
+    cv2.waitKey(0)
+    cv2.destroyAllWindows() 
 
 
 if __name__ == "__main__":
