@@ -263,11 +263,11 @@ class FruitClassifierApp:
         candidatos = []
         if relacion_aspecto < 0.5 and circularidad < 0.7:
             candidatos.append("Plátano")
-        if 0.6 < relacion_aspecto < 0.8 and 0.4 < circularidad < 0.6:
+        if 0.312 < relacion_aspecto < 0.77 and 0.020 < circularidad < 0.769:
             candidatos.append("Aguacate")
-        if relacion_aspecto > 0.9 and 0.2 < circularidad < 0.7:
+        if 0.591 < relacion_aspecto < 0.750 and 0.046 < circularidad < 0.772:
             candidatos.append("Limón")
-        if 0.6 < relacion_aspecto < 0.9 and 0.2 < circularidad < 0.7:
+        if 0.405 < relacion_aspecto < 0.889 and 0.019 < circularidad < 0.772:
             candidatos.append("Mango")
         
         if not candidatos:
@@ -280,7 +280,7 @@ class FruitClassifierApp:
         for candidato in candidatos:
             score = self.clasificar_por_color(self.imagen_hsv, self.mask_actual, candidato)
             resultados_color[candidato] = score
-            self.log_debug(f"Coincidencia de color con {candidato}: {score:.2%}")
+            self.log_debug(f"Coincidencia de color con {candidato}: {score:.3%}")
         
         # Seleccionar el mejor candidato
         mejor_candidato = max(resultados_color.items(), key=lambda x: x[1])

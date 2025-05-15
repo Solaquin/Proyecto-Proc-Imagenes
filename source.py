@@ -2,6 +2,7 @@ import cv2
 import numpy as np
 import os
 import pandas as pd
+import math
 import pywt
 from skimage.measure import label, regionprops
 from scipy.spatial.distance import euclidean
@@ -235,6 +236,75 @@ def clasificar_imagen(IMG_PRUEBAS):
 
     return mejor_fruta
 
+def calcular_circularidad(region):
+    if region.perimeter == 0:
+        return 0
+    return 4 * np.pi * region.area / (region.perimeter ** 2)
+
+def calcular_aspecto_y_circularidad(contorno):
+    area = cv2.contourArea(contorno)
+    perimetro = cv2.arcLength(contorno, True)
+    if perimetro == 0:
+        return None, None
+
+    rect = cv2.minAreaRect(contorno)
+    (x, y), (w, h), angulo = rect
+    if h == 0:
+        return None, None
+
+    if w > h:
+        w, h = h, w
+
+    aspecto = w / h
+    circularidad = (4 * math.pi * area) / (perimetro ** 2)
+    return aspecto, circularidad
+
+# Cambia esta ruta por la ruta de tus carpetas de imágenes
+ruta_base = "dataset"
+
+frutas = ["aguacate", "limon", "maduro", "mango"]
+resultados = {}
+
+for fruta in frutas:
+    aspectos = []
+    circularidades = []
+    ruta_fruta = os.path.join(ruta_base, fruta)
+    for nombre_img in os.listdir(ruta_fruta):
+        path = os.path.join(ruta_fruta, nombre_img)
+        img = cv2.imread(path)
+        if img is None:
+            continue
+
+        gris = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        _, mascara = cv2.threshold(gris, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+
+        contornos, _ = cv2.findContours(mascara, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        if not contornos:
+            continue
+
+        contorno = max(contornos, key=cv2.contourArea)
+        aspecto, circ = calcular_aspecto_y_circularidad(contorno)
+
+        if aspecto is not None and circ is not None:
+            aspectos.append(aspecto)
+            circularidades.append(circ)
+
+    resultados[fruta] = {
+        "aspecto": {
+            "media": np.mean(aspectos),
+            "std": np.std(aspectos),
+            "min": np.min(aspectos),
+            "max": np.max(aspectos),
+        },
+        "circularidad": {
+            "media": np.mean(circularidades),
+            "std": np.std(circularidades),
+            "min": np.min(circularidades),
+            "max": np.max(circularidades),
+        },
+        "muestras": len(aspectos)
+    }
+
 # -------------------- Main --------------------
 
 def main():
@@ -269,8 +339,17 @@ def main():
     df = pd.DataFrame(rows)  # ← Aquí se usa `pd`
     print(df)
 
+   
+
+    for fruta, stats in resultados.items():
+        print(f"\n{fruta.capitalize()}:")
+        print(f"  Aspecto - media: {stats['aspecto']['media']:.3f}, std: {stats['aspecto']['std']:.3f}, min: {stats['aspecto']['min']:.3f}, max: {stats['aspecto']['max']:.3f}")
+        print(f"  Circularidad - media: {stats['circularidad']['media']:.3f}, std: {stats['circularidad']['std']:.3f}, min: {stats['circularidad']['min']:.3f}, max: {stats['circularidad']['max']:.3f}")
+        print(f"  Muestras: {stats['muestras']}")
+
     base_caracteristicas = np.load("base_caracteristicas.npy", allow_pickle=True).item()
     for fruta, caracteristicas in base_caracteristicas.items():
+     
      print(f"Fruta: {fruta}, Número de características: {len(caracteristicas)}")
     
     print("Subcarpetas encontradas en 'dataset':", os.listdir("dataset"))   
